@@ -22,4 +22,16 @@ namespace Texnomic.AdbNet
     {
         public CommandFailedException() : base("Command Failed.") { }
     }
+        public class SdkNotFoundException : Exception
+    {
+        public SdkNotFoundException() : base("Android SDK Not Installed or ANDROID_HOME Environment Variable Not Set.") { }
+    }
+    public class AdbNotFoundException : Exception
+    {
+        public AdbNotFoundException() : base("ADB.exe Not Found In Android SDK.") { }
+    }
+    public class UnableToStartAdbServerException : Exception
+    {
+        public UnableToStartAdbServerException() : base("Unable To Start ADB Server.") { }
+    }
 }

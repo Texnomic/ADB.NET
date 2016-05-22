@@ -1,56 +1,58 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Texnomic.AdbNet
 {
-    public class AdbClient : BaseClient
+    public class AdbServer : BaseClient
     {
-        #region Public Methods
-        public async Task<string> GetHostVersion()
+        public bool Start()
         {
-           return await ExcuteCommand("host:version");
+            Process[] Processes = Process.GetProcessesByName("adb");
+            if (Processes.Length > 0) return true;
+
+            string SdkDirectory = Environment.GetEnvironmentVariable("ANDROID_HOME", EnvironmentVariableTarget.Machine);
+            if (SdkDirectory == null) SdkDirectory = Environment.GetEnvironmentVariable("ANDROID_HOME", EnvironmentVariableTarget.User);
+            if (SdkDirectory == null) throw new SdkNotFoundException();
+            if (!Directory.Exists(SdkDirectory)) throw new SdkNotFoundException();
+
+            string AdbPath = Path.Combine(SdkDirectory, "platform-tools", "adb.exe");
+            if (!File.Exists(AdbPath)) throw new AdbNotFoundException();
+
+            Process AdbServer = new Process();
+            AdbServer.StartInfo.FileName = AdbPath;
+            AdbServer.StartInfo.Arguments = "start-server";
+            AdbServer.StartInfo.UseShellExecute = false;
+            AdbServer.StartInfo.CreateNoWindow = true;
+            AdbServer.StartInfo.RedirectStandardOutput = true;
+            AdbServer.StartInfo.RedirectStandardInput = true;
+            AdbServer.StartInfo.RedirectStandardError = true;
+            AdbServer.Start();
+
+            Thread.Sleep(1000);
+
+            if (AdbServer.HasExited) throw new UnableToStartAdbServerException();
+
+            return true;
         }
-        public async Task<string> GetDevices()
+        public async Task Stop()
         {
-           return await ExcuteCommand("host:devices");
+            string Result = await ExcuteCommand("host:kill");
         }
-        public async Task<string> ExcuteShell(int Port, string Command)
-        {
-            await Connect(5037);
-            await SwitchTransport(Port);
-            await WriteShell(Command);
-            string Result = await ReadShell();
-            Disconnect();
-            return Result;
-        }
-        #endregion
 
         #region Internal Methods
         internal async Task<string> ExcuteCommand(string Command)
         {
             await Connect(5037);
             await WriteCommand(Command);
-            string Result = await ReadCommand();
+            string Result = await ReadStatus();
             Disconnect();
             return Result;
-        }
-        internal async Task Register(int Port)
-        {
-            await Connect(5037);
-            await WriteCommand($"host:emulator:{Port}");
-            Disconnect();
-        }
-        internal async Task SwitchTransport(int Port)
-        {
-            await WriteCommand($"host:transport:emulator-{Port}");
-            string Status = await ProcessStatus();
         }
         internal async Task WriteCommand(string Command)
         {
@@ -67,15 +69,6 @@ namespace Texnomic.AdbNet
             string Message = await Read(Length);
 
             return Message;
-        }
-        internal async Task<string> ReadShell()
-        {
-            await ProcessStatus();
-            return await Reader.ReadToEndAsync();
-        }
-        internal async Task WriteShell(string Command)
-        {
-            await WriteCommand($"shell:{Command}");
         }
         internal async Task<string> ProcessStatus()
         {
@@ -113,6 +106,5 @@ namespace Texnomic.AdbNet
             return Message.Length.ToString("X4");
         }
         #endregion
-
     }
 }

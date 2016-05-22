@@ -25,7 +25,12 @@ namespace Texnomic.AdbNet.Playground
         async static Task MainAsync()
         {
             AdbClient Client = new AdbClient();
+            AdbServer Server = new AdbServer();
             Stopwatch StopWatch = new Stopwatch();
+
+            Server.Start();
+            //await Server.Stop();
+           
 
             Console.Write(await Client.GetDevices());
             Console.WriteLine("");

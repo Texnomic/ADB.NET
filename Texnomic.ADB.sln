@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.25123.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Texnomic.ADB", "Texnomic.ADB\Texnomic.ADB.csproj", "{6BDD6FD2-0D7C-4984-BBD8-672A859AA928}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Texnomic.AdbNet", "Texnomic.ADB\Texnomic.AdbNet.csproj", "{6BDD6FD2-0D7C-4984-BBD8-672A859AA928}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Texnomic.ADB.Console", "Texnomic.ADB.Console\Texnomic.ADB.Console.csproj", "{DAC8E5EF-FD92-47C4-93A2-2142CFC756E6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Texnomic.AdbNet.Playground", "Texnomic.ADB.Console\Texnomic.AdbNet.Playground.csproj", "{DAC8E5EF-FD92-47C4-93A2-2142CFC756E6}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{AEED0832-EDAC-450B-8F27-22BA206BFC61}"
 	ProjectSection(SolutionItems) = preProject
