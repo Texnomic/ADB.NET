@@ -50,7 +50,7 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Texnomic.ADB\Texnomic.AdbNet.csproj">
+    <ProjectReference Include="..\Texnomic.AdbNet\Texnomic.AdbNet.csproj">
       <Project>{6bdd6fd2-0d7c-4984-bbd8-672a859aa928}</Project>
       <Name>Texnomic.AdbNet</Name>
     </ProjectReference>
