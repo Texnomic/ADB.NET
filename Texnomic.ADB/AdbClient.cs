@@ -27,12 +27,6 @@ namespace Texnomic.AdbNet
             Disconnect();
             return Result;
         }
-        public async Task Register(int Port)
-        {
-            await CheckConnection();
-            await Send($"host:emulator:{Port}");
-            Disconnect();
-        }
         public async Task<string> ExcuteShell(int Port, string Command)
         {
             await CheckConnection();
@@ -45,6 +39,12 @@ namespace Texnomic.AdbNet
         #endregion
 
         #region Internal Methods
+        internal async Task Register(int Port)
+        {
+            await CheckConnection();
+            await Send($"host:emulator:{Port}");
+            Disconnect();
+        }
         internal async Task SwitchTransport(int Port)
         {
             await Send($"host:transport:emulator-{Port}");
