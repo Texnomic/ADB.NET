@@ -28,23 +28,36 @@ namespace Texnomic.AdbNet.Playground
             AdbServer Server = new AdbServer();
             Stopwatch StopWatch = new Stopwatch();
 
-            Server.Start();
+            await Server.Start();
             //await Server.Stop();
-           
 
-            Console.Write(await Client.GetDevices());
+            string Devices = await Server.GetDevices();
+            Console.Write(Devices);
             Console.WriteLine("");
 
             while (true)
             {
                 Console.Write("> ");
                 string Command = Console.ReadLine();
+                string Result = "";
 
                 StopWatch.Start();
-                string Result = await Client.ExcuteShell(5564, Command);
+                try
+                {
+                    Result = await Client.ExcuteShell(5564, Command);
+                }
+                catch(Exception Error)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine(Error.Message);
+                    Console.ForegroundColor = ConsoleColor.Green;
+                }
                 StopWatch.Stop();
 
+                Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine($"Time Taken: {StopWatch.ElapsedMilliseconds.ToString("d")} Milliseconds");
+                Console.ForegroundColor = ConsoleColor.Green;
+
                 StopWatch.Reset();
                 Console.Write(Result);
                 Console.WriteLine("");

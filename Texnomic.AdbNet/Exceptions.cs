@@ -10,6 +10,10 @@ namespace Texnomic.AdbNet
     {
         public UnexpectedMessageException() : base("Unexpected Message Received.") { }
     }
+    public class WrongMessageLengthException : Exception
+    {
+        public WrongMessageLengthException() : base("Wrong Message Length.") { }
+    }
     public class IncompleteMessageException : Exception
     {
         public IncompleteMessageException() : base("Incomplete Message Received.") { }

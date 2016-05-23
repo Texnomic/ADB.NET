@@ -11,100 +11,48 @@ namespace Texnomic.AdbNet
 {
     public class AdbServer : BaseClient
     {
-        public bool Start()
+        public async Task<bool> Start()
         {
-            Process[] Processes = Process.GetProcessesByName("adb");
-            if (Processes.Length > 0) return true;
-
-            string SdkDirectory = Environment.GetEnvironmentVariable("ANDROID_HOME", EnvironmentVariableTarget.Machine);
-            if (SdkDirectory == null) SdkDirectory = Environment.GetEnvironmentVariable("ANDROID_HOME", EnvironmentVariableTarget.User);
-            if (SdkDirectory == null) throw new SdkNotFoundException();
-            if (!Directory.Exists(SdkDirectory)) throw new SdkNotFoundException();
-
-            string AdbPath = Path.Combine(SdkDirectory, "platform-tools", "adb.exe");
-            if (!File.Exists(AdbPath)) throw new AdbNotFoundException();
-
-            Process AdbServer = new Process();
-            AdbServer.StartInfo.FileName = AdbPath;
-            AdbServer.StartInfo.Arguments = "start-server";
-            AdbServer.StartInfo.UseShellExecute = false;
-            AdbServer.StartInfo.CreateNoWindow = true;
-            AdbServer.StartInfo.RedirectStandardOutput = true;
-            AdbServer.StartInfo.RedirectStandardInput = true;
-            AdbServer.StartInfo.RedirectStandardError = true;
-            AdbServer.Start();
-
-            Thread.Sleep(1000);
-
-            if (AdbServer.HasExited) throw new UnableToStartAdbServerException();
-
-            return true;
-        }
-        public async Task Stop()
-        {
-            string Result = await ExcuteCommand("host:kill");
-        }
-
-        #region Internal Methods
-        internal async Task<string> ExcuteCommand(string Command)
-        {
-            await Connect(5037);
-            await WriteCommand(Command);
-            string Result = await ReadStatus();
-            Disconnect();
-            return Result;
-        }
-        internal async Task WriteCommand(string Command)
-        {
-            await Writer.WriteLineAsync(Encode(Command));
-            await Writer.FlushAsync();
-        }
-        internal async Task<string> ReadCommand()
-        {
-            string Status = await ProcessStatus();
-
-            string Hex = await Read(4);
-            int Length = Convert.ToInt32(Hex, 16);
-
-            string Message = await Read(Length);
-
-            return Message;
-        }
-        internal async Task<string> ProcessStatus()
-        {
-            string Status = await ReadStatus();
-            if (Status == "FAIL") throw new CommandFailedException();
-            if (Status != "OKAY") throw new UnexpectedMessageException();
-            return Status;
-        }
-        internal async Task<string> ReadStatus()
-        {
-            return await Read(4);
-        }
-        internal async Task<string> Read(int Length = 1)
-        {
-            char[] Data = new char[Length];
-            int Index = 0;
-
-            while (true)
+            return await Task.Run(() =>
             {
-                await Reader.ReadBlockAsync(Data, Index, Length);
-                Index = Array.IndexOf<char>(Data, '\0');
-                if (Index == -1) break;
-                Length = Length - Index;
-                Thread.Sleep(100);
-            }
+                if (Process.GetProcessesByName("adb").Length > 0) return true;
 
-            return string.Concat(Data);
+                string SdkDirectory = Environment.GetEnvironmentVariable("ANDROID_HOME", EnvironmentVariableTarget.Machine);
+                if (SdkDirectory == null) SdkDirectory = Environment.GetEnvironmentVariable("ANDROID_HOME", EnvironmentVariableTarget.User);
+                if (SdkDirectory == null) throw new SdkNotFoundException();
+                if (!Directory.Exists(SdkDirectory)) throw new SdkNotFoundException();
+
+                string AdbPath = Path.Combine(SdkDirectory, "platform-tools", "adb.exe");
+                if (!File.Exists(AdbPath)) throw new AdbNotFoundException();
+
+                Process AdbServer = new Process();
+                AdbServer.StartInfo.FileName = AdbPath;
+                AdbServer.StartInfo.Arguments = "start-server";
+                AdbServer.StartInfo.UseShellExecute = false;
+                AdbServer.StartInfo.CreateNoWindow = true;
+                AdbServer.StartInfo.RedirectStandardOutput = true;
+                AdbServer.StartInfo.RedirectStandardInput = true;
+                AdbServer.StartInfo.RedirectStandardError = true;
+                AdbServer.Start();
+
+                Thread.Sleep(1000);
+
+                if (AdbServer.HasExited) throw new UnableToStartAdbServerException();
+
+                return true;
+            });
         }
-        internal string Encode(string Command)
+        public async Task<string> Stop()
         {
-            return $"{CalculateLength(Command)}{Command}";
+            return await ServerQuery("host:kill");
         }
-        internal string CalculateLength(string Message)
+        public async Task<string> GetHostVersion()
         {
-            return Message.Length.ToString("X4");
+            return await ServerQuery("host:version");
         }
-        #endregion
+        public async Task<string> GetDevices()
+        {
+            return await ServerQuery("host:devices");
+        }
     }
 }
