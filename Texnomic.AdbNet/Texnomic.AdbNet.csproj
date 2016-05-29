@@ -40,11 +40,19 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AdbServer.cs" />
-    <Compile Include="BaseClient.cs" />
-    <Compile Include="Exceptions.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="AdbClient.cs" />
+    <Compile Include="Emulator.cs" />
+    <Compile Include="Exceptions.cs" />
+    <Compile Include="Models\Shell.cs" />
+    <Compile Include="Models\ShellWorkflow.cs" />
+    <Compile Include="Models\Terminal.cs" />
+    <Compile Include="Protocol\Commands.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Protocol\Constants.cs" />
+    <Compile Include="Protocol\Destinations.cs" />
+    <Compile Include="Protocol\Messages.cs" />
+    <Compile Include="Protocol\Systems.cs" />
+    <Compile Include="Protocol\Workflow.cs" />
     <Compile Include="QueryResult.cs" />
   </ItemGroup>
   <ItemGroup />

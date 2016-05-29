@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using Texnomic.AdbNet;
+using System.Threading;
 
 namespace Texnomic.AdbNet.Playground
 {
@@ -25,15 +26,11 @@ namespace Texnomic.AdbNet.Playground
         async static Task MainAsync()
         {
             AdbClient Client = new AdbClient();
-            AdbServer Server = new AdbServer();
             Stopwatch StopWatch = new Stopwatch();
 
-            await Server.Start();
-            //await Server.Stop();
+            List<Emulator> Emulators = Client.GetEmulators();
 
-            string Devices = await Server.GetDevices();
-            Console.Write(Devices);
-            Console.WriteLine("");
+            Emulators.ForEach(Emulator => Console.WriteLine($"Emulator: {Emulator.EndPoint.Port}\n"));
 
             while (true)
             {
@@ -44,22 +41,22 @@ namespace Texnomic.AdbNet.Playground
                 StopWatch.Start();
                 try
                 {
-                    Result = await Client.ExcuteShell(5564, Command);
+                    Result = await Emulators[0].ExcuteShell(Command);
                 }
                 catch(Exception Error)
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine(Error.Message);
+                    Console.WriteLine($"Error: {Error.Message}");
                     Console.ForegroundColor = ConsoleColor.Green;
                 }
                 StopWatch.Stop();
 
+                Console.Write(Result);
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"Time Taken: {StopWatch.ElapsedMilliseconds.ToString("d")} Milliseconds");
+                Console.WriteLine($"\n\nTime Taken: {StopWatch.ElapsedMilliseconds.ToString("d")} Milliseconds");
                 Console.ForegroundColor = ConsoleColor.Green;
 
                 StopWatch.Reset();
-                Console.Write(Result);
                 Console.WriteLine("");
             }
 
