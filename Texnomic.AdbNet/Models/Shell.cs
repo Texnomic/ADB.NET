@@ -30,7 +30,7 @@ namespace Texnomic.AdbNet.Models
 
         private async Task<string> Intialize()
         {
-            Terminal = await ShellWorkflow.GetShellWorkflow(Stream, Systems.Host, LocalID);
+            Terminal = await ShellWorkflow.IntializeShellWorkflow(Stream, Reader, Systems.Host, LocalID);
             IsIntialized = true;
             return Terminal.Lines.Last();
         }
@@ -38,7 +38,8 @@ namespace Texnomic.AdbNet.Models
         public async Task<string> ExcuteShell(string Command)
         {
             if (!IsIntialized) await Intialize();
-            Terminal = await ShellWorkflow.ExcuteShellWorkflow(Stream, Reader, LocalID, $"{Command}\n", Terminal);
+            int Count = Terminal.Lines.Count;
+            Terminal = await ShellWorkflow.ExcuteShellWorkflow(Stream, Reader, LocalID, $"{Command}", Terminal);
             return Terminal.Lines.Last();
         }
     }

@@ -51,4 +51,8 @@ namespace Texnomic.AdbNet
         public MessageException(string Error) : base(Error) { }
         public MessageException(string Error, MessageException InnerException) : base(Error, InnerException) { }
     }
+    public class UnExpectedEndOfStreamException : Exception
+    {
+        public UnExpectedEndOfStreamException() : base("Unexpected End Of The TCP Stream.") { }
+    }
 }

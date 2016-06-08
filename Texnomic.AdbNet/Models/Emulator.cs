@@ -1,15 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
+﻿using System.IO;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading.Tasks;
-using Texnomic.AdbNet.Models;
 using Texnomic.AdbNet.Protocol;
 
-namespace Texnomic.AdbNet
+namespace Texnomic.AdbNet.Models
 {
     public class Emulator
     {
@@ -29,11 +24,27 @@ namespace Texnomic.AdbNet
 
             Intialize();
         }
+        public async Task<string> ExcuteShell(string Command)
+        {
+            return await Shell.ExcuteShell(Command);
+        }
+        public async Task<string> GetUITree()
+        {
+            return await Shell.ExcuteShell("uiautomator dump /dev/tty\r");
+        }
+        public void Cleanup()
+        {
+            Destroy();
+        }
 
         private void Intialize()
         {
             Client = new TcpClient();
             Client.Connect(EndPoint);
+            Client.ReceiveTimeout = 5;
+            Client.SendTimeout = 5;
+            Client.ReceiveBufferSize = 4096;
+            Client.LingerState = new LingerOption(false, 5);
             Stream = Client.GetStream();
             Reader = new StreamReader(Stream);
             Writer = new StreamWriter(Stream);
@@ -46,9 +57,6 @@ namespace Texnomic.AdbNet
             Writer.Close();
             Reader.Close();
         }
-        public async Task<string> ExcuteShell(string Command)
-        {
-            return await Shell.ExcuteShell(Command);
-        }
+
     }
 }

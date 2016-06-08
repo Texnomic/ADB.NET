@@ -133,9 +133,9 @@ namespace Texnomic.AdbNet.Protocol
             return CRC;
         }
     }
-    internal class ReadyMessage : Message
+    internal class OkayMessage : Message
     {
-        public ReadyMessage(uint LocalID, uint RemoteID)
+        public OkayMessage(uint LocalID, uint RemoteID)
         {
             SetCommand(Commands.Okay);
             SetArgument1(LocalID);
@@ -172,6 +172,16 @@ namespace Texnomic.AdbNet.Protocol
             SetArgument1(LocalID);
             SetArgument2(RemoteID);
             SetPayload(Payload);
+        }
+    }
+    internal class CloseMessage : Message
+    {
+        public CloseMessage(uint LocalID, uint RemoteID)
+        {
+            SetCommand(Commands.Close);
+            SetArgument1(LocalID);
+            SetArgument2(RemoteID);
+            SetPayload("");
         }
     }
 }

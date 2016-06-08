@@ -5,13 +5,9 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Security.Cryptography;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
-using Texnomic.AdbNet.Protocol;
-using Texnomic.AdbNet.Models;
 using System.Net.NetworkInformation;
+using Texnomic.AdbNet.Models;
 
 namespace Texnomic.AdbNet
 {
@@ -21,41 +17,52 @@ namespace Texnomic.AdbNet
         private const int Port = 5037;
         private const uint LocalID = 1234;
         private IPGlobalProperties IPGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
-        private List<Task> BackgroundThreads = new List<Task>();
+        private List<Task> BackgroundTasks = new List<Task>();
         private List<Emulator> Emulators = new List<Emulator>();
+        private List<TcpClient> MonitoredClients = new List<TcpClient>();
 
-        //public AdbClient()
-        //{
-        //    BackgroundThreads.Add(Task.Run(() => Server()));
-        //}
-        //private async Task Server()
-        //{
-        //    TcpListener Listener = new TcpListener(IPAddress.Parse(Localhost), Port);
-        //    Listener.Start();
+        public AdbClient()
+        {
+            BackgroundTasks.Add(Task.Run(() => MonitorServer()));
+        }
 
-        //    while (true)
-        //    {
-        //        TcpClient Client = await Listener.AcceptTcpClientAsync();
-        //        List<IPEndPoint> NewEmulators = Scan();
-        //        NewEmulators.ForEach(NEP => Emulators.Add(new Emulator(NEP, LocalID)));
-        //    }
-        //}
 
         public List<Emulator> GetEmulators()
         {
-            return CreateEmulators();
+            Scanner();
+            return Emulators;
         }
 
-        private List<Emulator> CreateEmulators()
+        private void MonitorServer()
         {
-            var Test = IPGlobalProperties.GetActiveTcpListeners();
-            List<IPEndPoint> EndPoints = GetEndPoints();
-            foreach (IPEndPoint EndPoint in EndPoints)
+            CheckAdb();
+
+            TcpListener Listener = new TcpListener(IPAddress.Parse(Localhost), Port);
+            Listener.Start();
+
+            while (true)
             {
-                Emulators.Add(new Emulator(EndPoint, LocalID));
+                HandleClient(Listener.AcceptTcpClient());
+
+                Scanner();
+            }
+        }
+        private void Scanner()
+        {
+            List<IPEndPoint> EndPoints = GetEndPoints();
+
+            foreach (Emulator Emulator in Emulators)
+            {
+                if (EndPoints.Contains(Emulator.EndPoint)) continue;
+                Emulator.Cleanup();
+                Emulators.Remove(Emulator);
             }
 
-            return Emulators;
+            foreach (IPEndPoint EndPoint in EndPoints)
+            {
+                if (Emulators.Exists(Emulator => Emulator.EndPoint.Port == EndPoint.Port)) continue;
+                Emulators.Add(new Emulator(EndPoint, LocalID));
+            }
         }
         private List<IPEndPoint> GetEndPoints()
         {
@@ -65,6 +72,67 @@ namespace Texnomic.AdbNet
                                      .Where(EP => EP.Port % 2 == 1)
                                      .Where(EP => EP.Address.ToString() == Localhost)
                                      .ToList();
+        }
+
+        private void CheckAdb()
+        {
+            if(Process.GetProcessesByName("adb").Length > 0)
+            {
+                KillAdbServer();
+            }
+        }
+        private void KillAdbServer()
+        {
+            using (TcpClient Client = new TcpClient())
+            {
+                Client.Connect(Localhost, Port);
+
+                using (StreamWriter Writer = new StreamWriter(Client.GetStream()))
+                {
+                    Writer.Write("0009host:kill");
+                    Writer.Flush();
+                    Process.GetProcessesByName("adb")[0].WaitForExit();
+                    Console.WriteLine("ADB Server Killed.");
+                }
+            }
+        }
+
+        private void HandleClient(TcpClient Client)
+        {
+            StreamReader Reader = new StreamReader(Client.GetStream());
+            StreamWriter Writer = new StreamWriter(Client.GetStream());
+
+            char[] RawSize = new char[4];
+            Reader.Read(RawSize, 0, 4);
+            int Size = Convert.ToInt32(string.Concat(RawSize), 16);
+
+            char[] RawMessage = new char[Size];
+            Reader.Read(RawMessage, 0, Size);
+
+            string Message = string.Concat(RawMessage);
+
+            if (Message.StartsWith("host:emulator:"))
+            {
+                Console.WriteLine(Message);
+                Client.Close();
+
+            }
+
+            if (Message == "host:track-devices")
+            {
+                Console.WriteLine(Message);
+                Writer.Write("OKAY");
+                Writer.Flush();
+
+                Writer.Write("0016emulator-5564\toffline\n");
+                Writer.Flush();
+
+
+                Writer.Write("0015emulator-5564\tdevice\n");
+                Writer.Flush();
+
+                MonitoredClients.Add(Client);
+            }
         }
     }
 

@@ -13,23 +13,25 @@ namespace Texnomic.AdbNet.Models
     {
         public async Task<Terminal> ExcuteShellWorkflow(NetworkStream Stream, StreamReader Reader, uint LocalID, string Payload, Terminal Terminal)
         {
-            Message Message = await REPLWorkflow(Stream, Reader, LocalID, Terminal.RemoteID, Payload);
-            Terminal.Lines.Add(Message.Payload);
+            List<Message> Messages = await REPLWorkflow(Stream, Reader, LocalID, Terminal.RemoteID, Payload);
+            string Result = "";
+            Messages.ForEach(Message => Result += Message.Payload);
+            Terminal.Lines.Add(Result);
             return Terminal;
         }
-        public async Task<Terminal> GetShellWorkflow(NetworkStream Stream, Systems System, uint LocalID)
+        public async Task<Terminal> IntializeShellWorkflow(NetworkStream Stream, StreamReader Reader, Systems System, uint LocalID)
         {
-            Message ClientConnect = await ConnectWorkflow(Stream, System);
-            Message ClientShell = await OpenShellWorkflow(Stream, LocalID);
+            Message ClientConnect = await ConnectWorkflow(Stream, Reader, System);
+            Message ClientShell = await OpenShellWorkflow(Stream, Reader, LocalID);
             Terminal Terminal = new Terminal();
             Terminal.RemoteID = ClientShell.Argument1;
             Terminal.Lines.Add(ClientShell.Payload);
             return Terminal;
         }
-        private async Task<Message> OpenShellWorkflow(NetworkStream Stream, uint LocalID)
+        private async Task<Message> OpenShellWorkflow(NetworkStream Stream, StreamReader Reader, uint LocalID)
         {
-            Message ClientShell = await OpenWorkflow(Stream, LocalID, "shell:\0");
-            await ReadyWorkflow(Stream, LocalID, ClientShell.Argument1);
+            Message ClientShell = await OpenWorkflow(Stream, Reader, LocalID, "shell:\0");
+            await OkayWorkflow(Stream, LocalID, ClientShell.Argument1);
             return ClientShell;
         }
     }
