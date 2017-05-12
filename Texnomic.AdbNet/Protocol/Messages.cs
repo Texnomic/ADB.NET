@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 
 namespace Texnomic.AdbNet.Protocol
 {
-    internal class Message
+    public class Message
     {
-        public Commands? Command { get; private set; }
+        public Command? Command { get; private set; }
         public uint Argument1 { get; private set; }
         public uint Argument2 { get; private set; }
         public int PayloadLength { get; private set; }
@@ -31,16 +31,20 @@ namespace Texnomic.AdbNet.Protocol
         }
         public void SetCommand(uint Command)
         {
-            string CommandName = Enum.GetName(typeof(Commands), Command);
+            string CommandName = Enum.GetName(typeof(Command), Command);
             if (CommandName == null) { throw new InvalidMessageTypeException(); }
-            SetCommand((Commands)Command);
+            SetCommand((Command)Command);
         }
-        public void SetCommand(Commands Command)
+        public void SetCommand(Command Command)
         {
             RawCommand = BitConverter.GetBytes((uint)Command);
             this.Command = Command;
             Magic = (uint)Command ^ 0xffffffff;
             RawMagic = BitConverter.GetBytes((uint)Magic);
+        }
+        public void SetCommand(string Command)
+        {
+            this.Command = (Command)Enum.Parse(typeof(Command), Command);
         }
         public void SetArgument1(byte[] Argument1)
         {
@@ -52,6 +56,11 @@ namespace Texnomic.AdbNet.Protocol
             RawArgument1 = BitConverter.GetBytes(Argument1);
             this.Argument1 = Argument1;
         }
+        public void SetArgument1(string Argument1)
+        {
+            RawArgument1 = Encoding.ASCII.GetBytes(Argument1);
+            this.Argument1 = BitConverter.ToUInt32(RawArgument1, 0);
+        }
         public void SetArgument2(byte[] Argument2)
         {
             RawArgument2 = Argument2;
@@ -61,6 +70,11 @@ namespace Texnomic.AdbNet.Protocol
         {
             RawArgument2 = BitConverter.GetBytes(Argument2);
             this.Argument2 = Argument2;
+        }
+        public void SetArgument2(string Argument2)
+        {
+            RawArgument2 = Encoding.ASCII.GetBytes(Argument2);
+            this.Argument2 = BitConverter.ToUInt32(RawArgument2, 0);
         }
         public void SetPayload(byte[] Payload)
         {
@@ -133,52 +147,52 @@ namespace Texnomic.AdbNet.Protocol
             return CRC;
         }
     }
-    internal class OkayMessage : Message
+    public class OkayMessage : Message
     {
         public OkayMessage(uint LocalID, uint RemoteID)
         {
-            SetCommand(Commands.Okay);
+            SetCommand(Protocol.Command.OKAY);
             SetArgument1(LocalID);
             SetArgument2(RemoteID);
             SetPayload("");
         }
     }
-    internal class OpenMessage : Message
+    public class OpenMessage : Message
     {
         public OpenMessage(uint LocalID, string Destination)
         {
-            SetCommand(Commands.Open);
+            SetCommand(Protocol.Command.OPEN);
             SetArgument1(LocalID);
             SetArgument2(0x0);
             SetPayload(Destination);
         }
     }
-    internal class ConnectMessage : Message
+    public class ConnectMessage : Message
     {
         public ConnectMessage(Systems System, string Serial = Constants.Serial, string Banner = Constants.Banner)
         {
-            SetCommand(Commands.Connect);
+            SetCommand(Protocol.Command.CNXN);
             SetArgument1(Constants.Version); //Version
             SetArgument2(Constants.MaxData); //Max Data
-            string SystemIdentity = $"{Enum.GetName(typeof(Systems), System)}:{Serial}:{Banner}";
+            string SystemIdentity = $"{System.ToString()}:{Serial}:{Banner}";
             SetPayload(SystemIdentity);
         }
     }
-    internal class WriteMessage : Message
+    public class WriteMessage : Message
     {
         public WriteMessage(uint LocalID, uint RemoteID, string Payload)
         {
-            SetCommand(Commands.Write);
+            SetCommand(Protocol.Command.WRTE);
             SetArgument1(LocalID);
             SetArgument2(RemoteID);
             SetPayload(Payload);
         }
     }
-    internal class CloseMessage : Message
+    public class CloseMessage : Message
     {
         public CloseMessage(uint LocalID, uint RemoteID)
         {
-            SetCommand(Commands.Close);
+            SetCommand(Protocol.Command.CLSE);
             SetArgument1(LocalID);
             SetArgument2(RemoteID);
             SetPayload("");

@@ -11,6 +11,6 @@ namespace Texnomic.AdbNet.Protocol
         public const uint Version = 0x01000000;
         public const uint MaxData = 0x00040000;
         public const string Serial = "";
-        public const string Banner = "features=shell_2";
+        public const string Banner = "features=stat_v2,shell_2,cmd";
     }
 }

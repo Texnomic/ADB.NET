@@ -9,15 +9,15 @@ using System.Threading.Tasks;
 
 namespace Texnomic.AdbNet.Protocol
 {
-    class Base
+    public class Core
     {
-        internal async Task SendMessage(NetworkStream Stream, Message Message)
+        public async Task SendMessage(NetworkStream Stream, Message Message)
         {
             byte[] RawMessage = Message.GetPacket();
             await Stream.WriteAsync(RawMessage, 0, RawMessage.Length);
             await Stream.FlushAsync();
         }
-        internal async Task<Message> RecieveMessageWithPayload(NetworkStream Stream, StreamReader Reader)
+        public async Task<Message> RecieveMessageWithPayload(NetworkStream Stream, StreamReader Reader, bool EnableFakeCRC32 = true)
         {
             Message Message = new Message();
 
@@ -28,25 +28,21 @@ namespace Texnomic.AdbNet.Protocol
             int Length = BitConverter.ToInt32(await Recieve(Stream, 4), 0);
             uint FakeCRC32 = BitConverter.ToUInt32(await Recieve(Stream, 4), 0);
             byte[] Magic = await Recieve(Stream, 4);
-
-
-            if (Message.Command == Commands.Okay || Message.Command == Commands.Close)
-            {
-                Message.SetPayload("");
-                return Message;
-            }
 
             char[] Payload = await Recieve(Reader, Length);
             Message.SetPayload(Payload);
 
-            if (FakeCRC32 != Message.FakeCRC32)
+            if (EnableFakeCRC32)
             {
-                throw new InvalidMessageCRC32Exception();
+                if (FakeCRC32 != Message.FakeCRC32)
+                {
+                    throw new InvalidMessageCRC32Exception();
+                }
             }
 
             return Message;
         }
-        internal async Task<Message> RecieveMessageWithoutPayload(NetworkStream Stream)
+        public async Task<Message> RecieveMessageWithoutPayload(NetworkStream Stream)
         {
             Message Message = new Message();
 
@@ -60,35 +56,7 @@ namespace Texnomic.AdbNet.Protocol
 
             return Message;
         }
-        internal async Task<Message> RecieveStreamingMessage(NetworkStream Stream, StreamReader Reader, OkayMessage OkayMessage)
-        {
-            Message Message = new Message();
 
-            Message.SetCommand(await Recieve(Stream, 4));
-            Message.SetArgument1(await Recieve(Stream, 4));
-            Message.SetArgument2(await Recieve(Stream, 4));
-
-            int Length = BitConverter.ToInt32(await Recieve(Stream, 4), 0);
-            uint FakeCRC32 = BitConverter.ToUInt32(await Recieve(Stream, 4), 0);
-            byte[] Magic = await Recieve(Stream, 4);
-
-
-            if (Message.Command == Commands.Okay)
-            {
-                Message.SetPayload("");
-                return Message;
-            }
-
-            char[] Payload = await RecieveStreaming(Stream, Reader, OkayMessage);
-            Message.SetPayload(Payload);
-
-            //if (FakeCRC32 != Message.FakeCRC32)
-            //{
-            //    throw new InvalidMessageCRC32Exception();
-            //}
-
-            return Message;
-        }
         private async Task<byte[]> Recieve(NetworkStream Stream, int Lenght)
         {
             byte[] Payload = new byte[Lenght];
@@ -100,6 +68,40 @@ namespace Texnomic.AdbNet.Protocol
             char[] Payload = new char[Lenght];
             await Reader.ReadBlockAsync(Payload, 0, Payload.Length);
             return Payload;
+        }
+
+        //Support for Older Messages where Payload length is wrong
+        private async Task<Message> RecieveStreamingMessage(NetworkStream Stream, StreamReader Reader, OkayMessage OkayMessage, bool EnableFakeCRC32 = false)
+        {
+            Message Message = new Message();
+
+            Message.SetCommand(await Recieve(Stream, 4));
+            Message.SetArgument1(await Recieve(Stream, 4));
+            Message.SetArgument2(await Recieve(Stream, 4));
+
+            int Length = BitConverter.ToInt32(await Recieve(Stream, 4), 0);
+            uint FakeCRC32 = BitConverter.ToUInt32(await Recieve(Stream, 4), 0);
+            byte[] Magic = await Recieve(Stream, 4);
+
+
+            if (Message.Command == Command.OKAY)
+            {
+                Message.SetPayload("");
+                return Message;
+            }
+
+            char[] Payload = await RecieveStreaming(Stream, Reader, OkayMessage);
+            Message.SetPayload(Payload);
+
+            if (EnableFakeCRC32)
+            {
+                if (FakeCRC32 != Message.FakeCRC32)
+                {
+                    throw new InvalidMessageCRC32Exception();
+                }
+            }
+
+            return Message;
         }
         private async Task<char[]> RecieveStreaming(NetworkStream Stream, StreamReader Reader, OkayMessage OkayMessage)
         {
@@ -120,4 +122,5 @@ namespace Texnomic.AdbNet.Protocol
             return Payload.ToArray();
         }
     }
+
 }

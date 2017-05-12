@@ -5,42 +5,41 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml;
 using Texnomic.AdbNet.Protocol;
 
 namespace Texnomic.AdbNet.Models
 {
-    internal class Shell
+    public class Shell
     {
-        private bool IsIntialized = false;
-        private ShellWorkflow ShellWorkflow { get; set; }
-        private Terminal Terminal { get; set; }
+        private ShellFlow ShellFlow { get; set; }
         private StreamReader Reader { get; set; }
         private NetworkStream Stream { get; set; }
-        private Systems System { get; set; }
+        public Systems System { get; set; }
         private uint LocalID { get; set; }
 
-        public Shell(NetworkStream Stream, StreamReader Reader, Systems System, uint LocalID)
+        public Shell(NetworkStream Stream, StreamReader Reader, uint LocalID)
         {
             this.Stream = Stream;
             this.Reader = Reader;
             this.System = System;
             this.LocalID = LocalID;
-            ShellWorkflow = new ShellWorkflow();
+            ShellFlow = new ShellFlow(Stream, Reader, LocalID);
         }
 
-        private async Task<string> Intialize()
+        public async Task<string> Excute(string Command)
         {
-            Terminal = await ShellWorkflow.IntializeShellWorkflow(Stream, Reader, Systems.Host, LocalID);
-            IsIntialized = true;
-            return Terminal.Lines.Last();
+            return await ShellFlow.ExcuteShellFlow(Command);
+        }
+        public async Task<XmlDocument> GetUIXml()
+        {
+            string Raw = await Excute("uiautomator dump /dev/tty");
+            List<string> Terminal = Raw.Split(new string[] { "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries).ToList();
+            string XML = string.Concat(Terminal.Take(Terminal.Count - 2));
+            XmlDocument Document = new XmlDocument();
+            Document.LoadXml(XML);
+            return Document;
         }
 
-        public async Task<string> ExcuteShell(string Command)
-        {
-            if (!IsIntialized) await Intialize();
-            int Count = Terminal.Lines.Count;
-            Terminal = await ShellWorkflow.ExcuteShellWorkflow(Stream, Reader, LocalID, $"{Command}", Terminal);
-            return Terminal.Lines.Last();
-        }
     }
 }
