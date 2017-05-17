@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -11,115 +12,111 @@ namespace Texnomic.AdbNet.Protocol
 {
     public class Core
     {
-        public async Task SendMessage(NetworkStream Stream, Message Message)
+        private TcpClient Client;
+        private NetworkStream Stream;
+
+        public Core(IPEndPoint EndPoint)
+        {
+            Client = new TcpClient();
+            Client.Connect(EndPoint);
+            Client.ReceiveTimeout = 30 * 1000;
+            Client.SendTimeout = 30 * 1000;
+            Client.ReceiveBufferSize = 4096;
+            Client.LingerState = new LingerOption(false, 30);
+            Stream = Client.GetStream();
+        }
+
+        public async Task SendMessage(Message Message)
         {
             byte[] RawMessage = Message.GetPacket();
             await Stream.WriteAsync(RawMessage, 0, RawMessage.Length);
             await Stream.FlushAsync();
         }
-        public async Task<Message> RecieveMessageWithPayload(NetworkStream Stream, StreamReader Reader, bool EnableFakeCRC32 = true)
+
+        public async Task<T> RecieveMessage<T>(bool CheckCRC32 = true, bool StreamingPayload = false, OkayMessage OkayMessage = null) where T: Message, new()
         {
-            Message Message = new Message();
+            T Message = await RecieveHeaders<T>();
 
-            Message.SetCommand(await Recieve(Stream, 4));
-            Message.SetArgument1(await Recieve(Stream, 4));
-            Message.SetArgument2(await Recieve(Stream, 4));
-
-            int Length = BitConverter.ToInt32(await Recieve(Stream, 4), 0);
-            uint FakeCRC32 = BitConverter.ToUInt32(await Recieve(Stream, 4), 0);
-            byte[] Magic = await Recieve(Stream, 4);
-
-            char[] Payload = await Recieve(Reader, Length);
-            Message.SetPayload(Payload);
-
-            if (EnableFakeCRC32)
+            if (Message.PayloadLength > 0)
             {
-                if (FakeCRC32 != Message.FakeCRC32)
+                if (StreamingPayload)
                 {
-                    throw new InvalidMessageCRC32Exception();
+                    Message.Payload = await RecieveStreamingPayload(Message.PayloadLength, OkayMessage);
+                }
+                else
+                {
+                    Message.Payload = await RecieveBytes(Message.PayloadLength);
+
+                    if (CheckCRC32)
+                    {
+                        if (Message.GenerateFakeCRC32(Message.Payload) != Message.FakeCRC32)
+                        {
+                            throw new InvalidMessageCRC32Exception();
+                        }
+                    }
                 }
             }
 
             return Message;
         }
-        public async Task<Message> RecieveMessageWithoutPayload(NetworkStream Stream)
+
+        private async Task<byte[]> RecieveStreamingPayload(int Length, OkayMessage OkayMessage)
         {
-            Message Message = new Message();
-
-            Message.SetCommand(await Recieve(Stream, 4));
-            Message.SetArgument1(await Recieve(Stream, 4));
-            Message.SetArgument2(await Recieve(Stream, 4));
-
-            int Length = BitConverter.ToInt32(await Recieve(Stream, 4), 0);
-            uint FakeCRC32 = BitConverter.ToUInt32(await Recieve(Stream, 4), 0);
-            byte[] Magic = await Recieve(Stream, 4);
-
-            return Message;
-        }
-
-        private async Task<byte[]> Recieve(NetworkStream Stream, int Lenght)
-        {
-            byte[] Payload = new byte[Lenght];
-            await Stream.ReadAsync(Payload, 0, Payload.Length);
-            return Payload;
-        }
-        private async Task<char[]> Recieve(StreamReader Reader, int Lenght)
-        {
-            char[] Payload = new char[Lenght];
-            await Reader.ReadBlockAsync(Payload, 0, Payload.Length);
-            return Payload;
-        }
-
-        //Support for Older Messages where Payload length is wrong
-        private async Task<Message> RecieveStreamingMessage(NetworkStream Stream, StreamReader Reader, OkayMessage OkayMessage, bool EnableFakeCRC32 = false)
-        {
-            Message Message = new Message();
-
-            Message.SetCommand(await Recieve(Stream, 4));
-            Message.SetArgument1(await Recieve(Stream, 4));
-            Message.SetArgument2(await Recieve(Stream, 4));
-
-            int Length = BitConverter.ToInt32(await Recieve(Stream, 4), 0);
-            uint FakeCRC32 = BitConverter.ToUInt32(await Recieve(Stream, 4), 0);
-            byte[] Magic = await Recieve(Stream, 4);
-
-
-            if (Message.Command == Command.OKAY)
-            {
-                Message.SetPayload("");
-                return Message;
-            }
-
-            char[] Payload = await RecieveStreaming(Stream, Reader, OkayMessage);
-            Message.SetPayload(Payload);
-
-            if (EnableFakeCRC32)
-            {
-                if (FakeCRC32 != Message.FakeCRC32)
-                {
-                    throw new InvalidMessageCRC32Exception();
-                }
-            }
-
-            return Message;
-        }
-        private async Task<char[]> RecieveStreaming(NetworkStream Stream, StreamReader Reader, OkayMessage OkayMessage)
-        {
-            List<char> Payload = new List<char>();
-            char[] Buffer = new char[1024];
-            byte[] Okay = OkayMessage.GetPacket();
+            List<byte> Data = new List<byte>(Length);
+            byte[] Buffer = new byte[Length];
             int Recieved = 0;
 
-            while (Stream.DataAvailable)
+            while (true)
             {
-                Recieved = await Reader.ReadAsync(Buffer, 0, Buffer.Length);
-                await Stream.WriteAsync(Okay, 0, Okay.Length);
-                await Stream.FlushAsync();
-                Payload.AddRange(Buffer.Take(Recieved));
-                Buffer = new char[1024];
+                Recieved += await Stream.ReadAsync(Buffer, 0, Buffer.Length);
+                await SendMessage(OkayMessage);
+                Data.AddRange(Buffer.Take(Recieved));
+                if (Recieved == Length) break;
+                Buffer = new byte[Length - Recieved];
+                await Task.Delay(100);
             }
 
-            return Payload.ToArray();
+            return Data.ToArray();
+        }
+
+        private async Task<T> RecieveHeaders<T>() where T : Message, new()
+        {
+            T Message = new T()
+            {
+                Command = (Command)Enum.Parse(typeof(Command), await RecieveString(4)),
+                Argument1 = await RecieveUInt(4),
+                Argument2 = await RecieveUInt(4),
+                PayloadLength = await RecieveInt(4),
+                FakeCRC32 = await RecieveUInt(4),
+                Magic = await RecieveUInt(4)
+            };
+
+            return Message;
+        }
+        private async Task<byte[]> RecieveBytes(int Length)
+        {
+            byte[] Payload = new byte[Length];
+            int Read = await Stream.ReadAsync(Payload, 0, Length);
+            return Payload;
+        }
+        private async Task<string> RecieveString(int Length)
+        {
+            byte[] Payload = await RecieveBytes(Length);
+            return Encoding.UTF8.GetString(Payload);
+        }
+        private async Task<int> RecieveInt(int Length)
+        {
+            return BitConverter.ToInt32(await RecieveBytes(Length), 0); ;
+        }
+        private async Task<uint> RecieveUInt(int Length)
+        {
+            return BitConverter.ToUInt32(await RecieveBytes(Length), 0); ;
+        }
+
+        public void Close()
+        {
+            Stream.Close();
+            Client.Close();
         }
     }
 

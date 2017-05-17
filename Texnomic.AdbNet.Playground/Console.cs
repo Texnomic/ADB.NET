@@ -42,7 +42,7 @@ namespace Texnomic.AdbNet.Playground
 
                 Console.Write("> ");
                 string Command = Console.ReadLine();
-                string Result;
+                List<string> Result;
                 XmlDocument UIXmlDocument;
                 Console.WriteLine("");
 
@@ -66,6 +66,25 @@ namespace Texnomic.AdbNet.Playground
                         Objects = UIParser(UIXmlDocument);
                         DrawUITree(Objects);
                     }
+                    else if (Command.StartsWith("pull"))
+                    {
+                        StopWatch.Start();
+                        await Emulators[0].Sync.Pull(Command.Split('"')[1]);
+                        StopWatch.Stop();
+                        Console.WriteLine("[Task Completed]");
+                    }
+                    else if (Command.StartsWith("install"))
+                    {
+                        StopWatch.Start();
+                        Console.WriteLine(await Emulators[0].Install.Apk(Command.Split('"')[1]));
+                        StopWatch.Stop();
+                    }
+                    else if (Command.StartsWith("root"))
+                    {
+                        StopWatch.Start();
+                        Console.WriteLine(await Emulators[0].Root.Enable());
+                        StopWatch.Stop();
+                    }
                     else if (Command.StartsWith("mini"))
                     {
                         StopWatch.Start();
@@ -81,7 +100,7 @@ namespace Texnomic.AdbNet.Playground
                         StopWatch.Start();
                         Result = await Emulators[0].Shell.Excute(Command);
                         StopWatch.Stop();
-                        Console.Write(Result);
+                        Result.ForEach(Line => Console.WriteLine(Line));
                     }
                 }
                 catch (Exception Error)
@@ -115,7 +134,7 @@ namespace Texnomic.AdbNet.Playground
                     case 'T':
                     case 't':
                         {
-                            UIObject Object = Objects.Where(Obj => Obj.GUID == Commands[2].ToUpper()).First();
+                            UIObject Object = Objects.Where(Obj => Obj.GUID == Commands[2]).First();
                             Shell += $"input tap {Object.Bounds[0]} {Object.Bounds[1]};";
                             break;
                         }
@@ -167,42 +186,43 @@ namespace Texnomic.AdbNet.Playground
         {
             List<UIObject> UIObjects = new List<UIObject>();
 
-            XmlNodeList Nodes = Document.GetElementsByTagName("node");
+            XmlNodeList Nodes = Document.SelectNodes("//*");
 
 
             using (MD5 md5Hash = MD5.Create())
             {
                 foreach (XmlNode Node in Nodes)
                 {
-                    if (Node.HasChildNodes) continue;
+                    if (Node.Name != "node") continue;
 
                     try
                     {
-                        UIObject ASO = new UIObject();
-                        ASO.GUID = GetMd5Hash(md5Hash, Node.InnerXml, 2);
-                        ASO.Index = int.Parse(Node.Attributes["index"].Value);
-                        ASO.Text = Node.Attributes["text"].Value;
-                        ASO.ResourceID = Node.Attributes["resource-id"].Value;
-                        ASO.Class = Node.Attributes["class"].Value;
-                        ASO.Package = Node.Attributes["package"].Value;
-                        ASO.ContentDesc = Node.Attributes["content-desc"].Value;
-                        ASO.Checkable = bool.Parse(Node.Attributes["checkable"].Value);
-                        ASO.Checked = bool.Parse(Node.Attributes["checked"].Value);
-                        ASO.Clickable = bool.Parse(Node.Attributes["clickable"].Value);
-                        ASO.Enabled = bool.Parse(Node.Attributes["enabled"].Value);
-                        ASO.Focusable = bool.Parse(Node.Attributes["focusable"].Value);
-                        ASO.Focused = bool.Parse(Node.Attributes["focused"].Value);
-                        ASO.Scrollable = bool.Parse(Node.Attributes["scrollable"].Value);
-                        ASO.LongClickable = bool.Parse(Node.Attributes["long-clickable"].Value);
-                        ASO.Password = bool.Parse(Node.Attributes["password"].Value);
-                        ASO.Selected = bool.Parse(Node.Attributes["selected"].Value);
-                        ASO.Bounds = Node.Attributes["bounds"]
+                        UIObject ASO = new UIObject()
+                        {
+                            GUID = GetMd5Hash(md5Hash, Node.OuterXml, 2),
+                            Index = int.Parse(Node.Attributes["index"].Value),
+                            Text = Node.Attributes["text"].Value,
+                            ResourceID = Node.Attributes["resource-id"].Value,
+                            Class = Node.Attributes["class"].Value,
+                            Package = Node.Attributes["package"].Value,
+                            ContentDesc = Node.Attributes["content-desc"].Value,
+                            Checkable = bool.Parse(Node.Attributes["checkable"].Value),
+                            Checked = bool.Parse(Node.Attributes["checked"].Value),
+                            Clickable = bool.Parse(Node.Attributes["clickable"].Value),
+                            Enabled = bool.Parse(Node.Attributes["enabled"].Value),
+                            Focusable = bool.Parse(Node.Attributes["focusable"].Value),
+                            Focused = bool.Parse(Node.Attributes["focused"].Value),
+                            Scrollable = bool.Parse(Node.Attributes["scrollable"].Value),
+                            LongClickable = bool.Parse(Node.Attributes["long-clickable"].Value),
+                            Password = bool.Parse(Node.Attributes["password"].Value),
+                            Selected = bool.Parse(Node.Attributes["selected"].Value),
+                            Bounds = Node.Attributes["bounds"]
                                          .Value
                                          .Split(new char[] { ',', '[', ']' }, StringSplitOptions.RemoveEmptyEntries)
                                          .ToList()
                                          .Select(Index => int.Parse(Index))
-                                         .ToArray();
-
+                                         .ToArray()
+                        };
                         UIObjects.Add(ASO);
                     }
                     catch(Exception Error)

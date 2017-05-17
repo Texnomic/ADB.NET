@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -9,47 +10,19 @@ namespace Texnomic.AdbNet.Models
 {
     public class Emulator
     {
-        public IPEndPoint EndPoint { get; private set; }
-        public Shell Shell { get; set; }
+        public IPEndPoint EndPoint { get; }
+        public Shell Shell { get; }
+        public Sync Sync { get; }
+        public Root Root { get; }
+        public Install Install { get; }
 
-        private uint LocalID { get; set; }
-        private TcpClient Client { get; set; }
-        private NetworkStream Stream { get; set; }
-        private StreamReader Reader { get; set; }
-        private StreamWriter Writer { get; set; }
-
-        public Emulator(IPEndPoint EndPoint, uint LocalID)
+        public Emulator(IPEndPoint EndPoint)
         {
+            Shell = new Shell(EndPoint);
+            Sync = new Sync(EndPoint);
+            Root = new Root(EndPoint);
+            Install = new Install(EndPoint);
             this.EndPoint = EndPoint;
-            this.LocalID = LocalID;
-
-            Intialize();
-        }
-
-        public void Cleanup()
-        {
-            Destroy();
-        }
-
-        private void Intialize()
-        {
-            Client = new TcpClient();
-            Client.Connect(EndPoint);
-            Client.ReceiveTimeout = 30 * 1000;
-            Client.SendTimeout = 30 * 1000;
-            Client.ReceiveBufferSize = 4096;
-            Client.LingerState = new LingerOption(false, 30);
-            Stream = Client.GetStream();
-            Reader = new StreamReader(Stream, Encoding.UTF8);
-            Writer = new StreamWriter(Stream, Encoding.UTF8);
-            Shell = new Shell(Stream, Reader, LocalID);
-        }
-        private void Destroy()
-        {
-            Stream.Close();
-            Client.Close();
-            Writer.Close();
-            Reader.Close();
         }
 
     }

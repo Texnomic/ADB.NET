@@ -8,139 +8,35 @@ namespace Texnomic.AdbNet.Protocol
 {
     public class Message
     {
-        public Command? Command { get; private set; }
-        public uint Argument1 { get; private set; }
-        public uint Argument2 { get; private set; }
-        public int PayloadLength { get; private set; }
-        public uint FakeCRC32 { get; private set; }
-        public uint Magic { get; private set; }
-        public string Payload { get; private set; }
+        public Message() { }
 
-        internal byte[] RawCommand { get; set; }
-        internal byte[] RawArgument1 { get; set; }
-        internal byte[] RawArgument2 { get; set; }
-        internal byte[] RawPayloadLength { get; set; }
-        internal byte[] RawFakeCRC32 { get; set; }
-        internal byte[] RawMagic { get; set; }
-        internal byte[] RawPayload { get; set; }
+        public Command? Command { get; set; }
+        public uint Argument1 { get; set; }
+        public uint Argument2 { get; set; }
+        public int PayloadLength { get; set; }
+        public uint FakeCRC32 { get; set; }
+        public uint Magic { get; set; }
+        public byte[] Payload { get; set; }
 
-        public void SetCommand(byte[] Command)
-        {
-            RawCommand = Command;
-            SetCommand(BitConverter.ToUInt32(Command, 0));
-        }
-        public void SetCommand(uint Command)
-        {
-            string CommandName = Enum.GetName(typeof(Command), Command);
-            if (CommandName == null) { throw new InvalidMessageTypeException(); }
-            SetCommand((Command)Command);
-        }
-        public void SetCommand(Command Command)
-        {
-            RawCommand = BitConverter.GetBytes((uint)Command);
-            this.Command = Command;
-            Magic = (uint)Command ^ 0xffffffff;
-            RawMagic = BitConverter.GetBytes((uint)Magic);
-        }
-        public void SetCommand(string Command)
-        {
-            this.Command = (Command)Enum.Parse(typeof(Command), Command);
-        }
-        public void SetArgument1(byte[] Argument1)
-        {
-            RawArgument1 = Argument1;
-            this.Argument1 = BitConverter.ToUInt32(Argument1, 0);
-        }
-        public void SetArgument1(uint Argument1)
-        {
-            RawArgument1 = BitConverter.GetBytes(Argument1);
-            this.Argument1 = Argument1;
-        }
-        public void SetArgument1(string Argument1)
-        {
-            RawArgument1 = Encoding.ASCII.GetBytes(Argument1);
-            this.Argument1 = BitConverter.ToUInt32(RawArgument1, 0);
-        }
-        public void SetArgument2(byte[] Argument2)
-        {
-            RawArgument2 = Argument2;
-            this.Argument2 = BitConverter.ToUInt32(Argument2, 0);
-        }
-        public void SetArgument2(uint Argument2)
-        {
-            RawArgument2 = BitConverter.GetBytes(Argument2);
-            this.Argument2 = Argument2;
-        }
-        public void SetArgument2(string Argument2)
-        {
-            RawArgument2 = Encoding.ASCII.GetBytes(Argument2);
-            this.Argument2 = BitConverter.ToUInt32(RawArgument2, 0);
-        }
-        public void SetPayload(byte[] Payload)
-        {
-            this.Payload = Encoding.ASCII.GetString(Payload);
-            RawPayload = Payload;
-            SetPayloadLength();
-            SetFakeCRC32();
-        }
-        public void SetPayload(char[] Payload)
-        {
-            this.Payload = string.Concat(Payload);
-            RawPayload = Encoding.ASCII.GetBytes(Payload);
-            SetPayloadLength();
-            SetFakeCRC32();
-        }
-        public void SetPayload(string Payload)
-        {
-            this.Payload = Payload;
-            RawPayload = Encoding.ASCII.GetBytes(Payload);
-            SetPayloadLength();
-            SetFakeCRC32();
-        }
+
         public byte[] GetPacket()
         {
-            DoChecks();
             List<byte> Message = new List<byte>();
-            Message.AddRange(RawCommand);
-            Message.AddRange(RawArgument1);
-            Message.AddRange(RawArgument2);
-            Message.AddRange(RawPayloadLength);
-            Message.AddRange(RawFakeCRC32);
-            Message.AddRange(RawMagic);
-            Message.AddRange(RawPayload);
-
+            Message.AddRange(BitConverter.GetBytes((uint)Command));
+            Message.AddRange(BitConverter.GetBytes(Argument1));
+            Message.AddRange(BitConverter.GetBytes(Argument2));
+            Message.AddRange(BitConverter.GetBytes(PayloadLength));
+            Message.AddRange(BitConverter.GetBytes(FakeCRC32));
+            Message.AddRange(BitConverter.GetBytes(Magic));
+            Message.AddRange(Payload);
             return Message.ToArray();
         }
 
-        private void SetPayloadLength()
+        internal uint GenerateFakeCRC32(string Payload)
         {
-            PayloadLength = Payload.Length;
-            RawPayloadLength = BitConverter.GetBytes(RawPayload.Length);
+            return GenerateFakeCRC32(Encoding.ASCII.GetBytes(Payload));
         }
-        private void SetFakeCRC32()
-        {
-            if (Payload == null || Payload == "")
-            {
-                FakeCRC32 = 0x0;
-                RawFakeCRC32 = BitConverter.GetBytes(FakeCRC32);
-            }
-            else
-            {
-                FakeCRC32 = GenerateFakeCRC32(RawPayload);
-                RawFakeCRC32 = BitConverter.GetBytes(FakeCRC32);
-            }
-        }
-        private void DoChecks()
-        {
-            if (Command == null) throw new MessageException("Command Not Set.");
-            if (RawArgument1 == null) throw new MessageException("Argument 1 Not Set.");
-            if (RawArgument2 == null) throw new MessageException("Argument 2 Not Set.");
-            if (RawPayloadLength == null) throw new MessageException("Message Length Not Set.", new MessageException("Message Not Set."));
-            if (RawFakeCRC32 == null) throw new MessageException("Fake CRC32 Not Set.", new MessageException("Message Not Set."));
-            if (RawMagic == null) throw new MessageException("Magic Not Set.", new MessageException("Command Not Set."));
-            if (RawPayload == null) throw new MessageException("Message Not Set.");
-        }
-        private uint GenerateFakeCRC32(byte[] Payload)
+        internal uint GenerateFakeCRC32(byte[] Payload)
         {
             uint CRC = 0x0;
             for (var i = 0; i < Payload.Length; i++) CRC = (CRC + Payload[i]) & 0xFFFFFFFF;
@@ -149,53 +45,182 @@ namespace Texnomic.AdbNet.Protocol
     }
     public class OkayMessage : Message
     {
+        public OkayMessage() : base() { }
+
         public OkayMessage(uint LocalID, uint RemoteID)
         {
-            SetCommand(Protocol.Command.OKAY);
-            SetArgument1(LocalID);
-            SetArgument2(RemoteID);
-            SetPayload("");
+            Command = Protocol.Command.OKAY;
+            Argument1 = LocalID;
+            Argument2 = RemoteID;
+            Payload = new byte[0];
+            PayloadLength = 0;
+            FakeCRC32 = 0x0;
+            Magic = (uint)Command ^ 0xffffffff;
         }
     }
     public class OpenMessage : Message
     {
+        public OpenMessage() : base() { }
+
         public OpenMessage(uint LocalID, string Destination)
         {
-            SetCommand(Protocol.Command.OPEN);
-            SetArgument1(LocalID);
-            SetArgument2(0x0);
-            SetPayload(Destination);
+            Command = Protocol.Command.OPEN;
+            Argument1 = LocalID;
+            Argument2 = 0x0;
+            Payload = Encoding.ASCII.GetBytes(Destination);
+            PayloadLength = Payload.Length;
+            FakeCRC32 = GenerateFakeCRC32(Payload);
+            Magic = (uint)Command ^ 0xffffffff;
         }
     }
     public class ConnectMessage : Message
     {
         public ConnectMessage(Systems System, string Serial = Constants.Serial, string Banner = Constants.Banner)
         {
-            SetCommand(Protocol.Command.CNXN);
-            SetArgument1(Constants.Version); //Version
-            SetArgument2(Constants.MaxData); //Max Data
-            string SystemIdentity = $"{System.ToString()}:{Serial}:{Banner}";
-            SetPayload(SystemIdentity);
+            Command = Protocol.Command.CNXN;
+            Argument1 = Constants.Version; //Version
+            Argument2 = Constants.MaxData; //Max Data
+            Payload = Encoding.ASCII.GetBytes($"{System.ToString()}:{Serial}:{Banner}"); //System Identity
+            PayloadLength = Payload.Length;
+            FakeCRC32 = GenerateFakeCRC32(Payload);
+            Magic = (uint)Command ^ 0xffffffff;
         }
     }
     public class WriteMessage : Message
     {
+        public WriteMessage() { }
+
         public WriteMessage(uint LocalID, uint RemoteID, string Payload)
         {
-            SetCommand(Protocol.Command.WRTE);
-            SetArgument1(LocalID);
-            SetArgument2(RemoteID);
-            SetPayload(Payload);
+            Command = Protocol.Command.WRTE;
+            Argument1 = LocalID;
+            Argument2 = RemoteID;
+            this.Payload = Encoding.ASCII.GetBytes(Payload);
+            PayloadLength = Payload.Length;
+            FakeCRC32 = GenerateFakeCRC32(this.Payload);
+            Magic = (uint)Command ^ 0xffffffff;
+        }
+        public WriteMessage(uint LocalID, uint RemoteID, byte[] Payload)
+        {
+            Command = Protocol.Command.WRTE;
+            Argument1 = LocalID;
+            Argument2 = RemoteID;
+            this.Payload = Payload;
+            PayloadLength = Payload.Length;
+            FakeCRC32 = GenerateFakeCRC32(this.Payload);
+            Magic = (uint)Command ^ 0xffffffff;
         }
     }
     public class CloseMessage : Message
     {
+        public CloseMessage() : base() { }
+
         public CloseMessage(uint LocalID, uint RemoteID)
         {
-            SetCommand(Protocol.Command.CLSE);
-            SetArgument1(LocalID);
-            SetArgument2(RemoteID);
-            SetPayload("");
+            Command = Protocol.Command.CLSE;
+            Argument1 = LocalID;
+            Argument2 = RemoteID;
+            Payload = new byte[0];
+            PayloadLength = 0;
+            FakeCRC32 = 0x0;
+            Magic = (uint)Command ^ 0xffffffff;
+        }
+    }
+
+    public class SyncMessage
+    {
+        public WriteMessage Message { get; }
+        public string ID { get; }
+        public int Parameter { get; }
+
+        public SyncMessage(WriteMessage Message)
+        {
+            this.Message = Message;
+            ID = Encoding.UTF8.GetString(Message.Payload.Take(4).ToArray());
+            Parameter = GetLittleEndianIntegerFromByteArray(Message.Payload.Skip(4).Take(4).ToArray(), 0);
+        }
+
+        public static int GetLittleEndianIntegerFromByteArray(byte[] data, int startIndex)
+        {
+            return (data[startIndex + 3] << 24)
+                 | (data[startIndex + 2] << 16)
+                 | (data[startIndex + 1] << 8)
+                 | data[startIndex];
+        }
+        public static byte[] GetLittleEndianByteArrayFromInteger(int data)
+        {
+            byte[] b = new byte[4];
+            b[0] = (byte)data;
+            b[1] = (byte)(((uint)data >> 8) & 0xFF);
+            b[2] = (byte)(((uint)data >> 16) & 0xFF);
+            b[3] = (byte)(((uint)data >> 24) & 0xFF);
+            return b;
+        }
+    }
+
+    public class StatSyncMessage : SyncMessage
+    {
+        public string Payload { get; }
+
+        public StatSyncMessage(WriteMessage Message) : base(Message)
+        {
+            Payload = Encoding.UTF8.GetString(Message.Payload.Skip(8).Take(Parameter).ToArray());
+        }
+
+        public StatSyncMessage(uint LocalID, uint RemoteID, string FilePath)
+            : base(new WriteMessage(LocalID, RemoteID,
+                Encoding.UTF8.GetBytes("STAT")
+                .Concat(GetLittleEndianByteArrayFromInteger(FilePath.Length))
+                .Concat(Encoding.UTF8.GetBytes(FilePath)).ToArray()))
+        {
+            Payload = Encoding.UTF8.GetString
+                (
+                Encoding.UTF8.GetBytes("STAT")
+                .Concat(GetLittleEndianByteArrayFromInteger(FilePath.Length))
+                .Concat(Encoding.UTF8.GetBytes(FilePath)).ToArray()
+                );
+        }
+    }
+
+    public class RecvSyncMessage : SyncMessage
+    {
+        public string Payload { get; }
+
+        public RecvSyncMessage(WriteMessage Message) : base(Message)
+        {
+            Payload = Encoding.UTF8.GetString(Message.Payload.Skip(8).Take(Parameter).ToArray());
+        }
+
+        public RecvSyncMessage(uint LocalID, uint RemoteID, string FilePath)
+            : base(new WriteMessage(LocalID, RemoteID,
+                Encoding.UTF8.GetBytes("RECV")
+                .Concat(GetLittleEndianByteArrayFromInteger(FilePath.Length))
+                .Concat(Encoding.UTF8.GetBytes(FilePath)).ToArray()))
+        {
+            Payload = Encoding.UTF8.GetString
+                (
+                Encoding.UTF8.GetBytes("RECV")
+                .Concat(GetLittleEndianByteArrayFromInteger(FilePath.Length))
+                .Concat(Encoding.UTF8.GetBytes(FilePath)).ToArray()
+                );
+        }
+    }
+
+    public class DataSyncMessage : SyncMessage
+    {
+        public byte[] Payload { get; }
+        public bool EndOfFile { get; }
+
+        public DataSyncMessage(WriteMessage Message) : base(Message)
+        {
+            Payload = Message.Payload.Skip(8).Take(Parameter).ToArray();
+
+            if (Message.PayloadLength - Parameter == 8)
+            {
+                string EOF = Encoding.UTF8.GetString(Message.Payload.Skip(Message.Payload.Length - 8).Take(4).ToArray());
+
+                if (EOF == "DONE") EndOfFile = true;
+            }
         }
     }
 }

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
@@ -12,32 +13,23 @@ namespace Texnomic.AdbNet.Models
 {
     public class Shell
     {
-        private ShellFlow ShellFlow { get; set; }
-        private StreamReader Reader { get; set; }
-        private NetworkStream Stream { get; set; }
-        public Systems System { get; set; }
-        private uint LocalID { get; set; }
+        private ShellFlow ShellFlow;
 
-        public Shell(NetworkStream Stream, StreamReader Reader, uint LocalID)
+        public Shell(IPEndPoint EndPoint)
         {
-            this.Stream = Stream;
-            this.Reader = Reader;
-            this.System = System;
-            this.LocalID = LocalID;
-            ShellFlow = new ShellFlow(Stream, Reader, LocalID);
+            ShellFlow = new ShellFlow(EndPoint);
         }
 
-        public async Task<string> Excute(string Command)
+        public async Task<List<string>> Excute(string Command)
         {
             return await ShellFlow.ExcuteShellFlow(Command);
         }
         public async Task<XmlDocument> GetUIXml()
         {
-            string Raw = await Excute("uiautomator dump /dev/tty");
-            List<string> Terminal = Raw.Split(new string[] { "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries).ToList();
-            string XML = string.Concat(Terminal.Take(Terminal.Count - 2));
+            List<string> Raw = await Excute("uiautomator dump /dev/tty");
+            Raw[0] = Raw[0].Replace("UI hierchary dumped to: /dev/tty", "");
             XmlDocument Document = new XmlDocument();
-            Document.LoadXml(XML);
+            Document.LoadXml(Raw[0]);
             return Document;
         }
 

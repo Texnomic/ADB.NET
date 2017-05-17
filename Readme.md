@@ -17,5 +17,15 @@ using Texnomic.AdbNet;
 AdbClient Client = new AdbClient();
 
 List<Emulator> Emulators = Client.GetEmulators();
+
+await Emulators[0].Root.Enable();
+
+await Emulators[0].Install.Apk("ApkPath");
+
 string Result = await Emulators[0].Shell.Excute("ls");
+
+XmlDocument Document = await Emulators[0].Shell.GetUIXml();
+
+await Emulators[0].Sync.Pull("FilePath");
+
 ```

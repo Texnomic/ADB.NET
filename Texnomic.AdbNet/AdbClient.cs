@@ -21,7 +21,6 @@ namespace Texnomic.AdbNet
     {
         private const string Localhost = "127.0.0.1";
         private const int Port = 5037;
-        private const uint LocalID = 1234;
         private IPGlobalProperties IPGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
         private List<Task> BackgroundTasks = new List<Task>();
         private List<Emulator> Emulators = new List<Emulator>();
@@ -65,14 +64,13 @@ namespace Texnomic.AdbNet
             for (int i = 0; i < Emulators.Count; i++)
             {
                 if (EndPoints.Contains(Emulators[i].EndPoint)) continue;
-                Emulators[i].Cleanup();
                 Emulators.Remove(Emulators[i]);
             }
 
             for (int i = 0; i < EndPoints.Count; i++)
             {
                 if (Emulators.Exists(Emulator => Emulator.EndPoint.Port == EndPoints[i].Port)) continue;
-                Emulators.Add(new Emulator(EndPoints[i], LocalID));
+                Emulators.Add(new Emulator(EndPoints[i]));
             }
         }
         private List<IPEndPoint> GetEndPoints()
@@ -166,7 +164,7 @@ namespace Texnomic.AdbNet
 
                         if (Emulators.Exists(Emulator => Emulator.EndPoint.GetHashCode() == EndPoint.GetHashCode()) == false)
                         {
-                            Emulators.Add(new Emulator(EndPoint, LocalID));
+                            Emulators.Add(new Emulator(EndPoint));
                         }
 
                         Writer.Write("0009Connected");
@@ -187,7 +185,6 @@ namespace Texnomic.AdbNet
                         {
                             if (Emulators[i].EndPoint.GetHashCode() == EndPoint.GetHashCode())
                             {
-                                Emulators[i].Cleanup();
                                 Emulators.Remove(Emulators[i]);
                                 break;
                             }

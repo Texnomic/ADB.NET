@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
@@ -11,87 +12,158 @@ namespace Texnomic.AdbNet.Models
 {
     class ShellFlow
     {
-        private Flows Flows = new Flows();
-        private bool IsIntialized = false;
+        private Flows Flows;
+        private IPEndPoint EndPoint;
+        private bool IsIntialized;
         private uint LocalID;
         private uint RemoteID;
-        private NetworkStream Stream;
-        private StreamReader Reader;
- 
-        public ShellFlow(NetworkStream Stream, StreamReader Reader, uint LocalID)
+        private string Username;
+
+        public ShellFlow(IPEndPoint EndPoint)
         {
-            this.Stream = Stream;
-            this.Reader = Reader;
-            this.LocalID = LocalID;
+            this.EndPoint = EndPoint;
+            IsIntialized = false;
+            LocalID = (uint)(new Random().Next(0, 9999));
         }
 
-        public async Task<string> ExcuteShellFlow(string Command)
+        public async Task<List<string>> ExcuteShellFlow(string Command)
         {
-            if (!IsIntialized) await IntializeShellFlow(Stream, Reader, LocalID);
-
+            if (!IsIntialized) await OpenShellFlow();
 
             foreach (char Character in Command)
             {
-                await Flows.WriteFlow(Stream, LocalID, RemoteID, "\0\x01\0\0\0" + Character);
-                await Flows.RecievePayloadFlow(Stream, Reader, LocalID, RemoteID);
+                await Flows.WriteFlow<OkayMessage>(LocalID, RemoteID, "\0\x01\0\0\0" + Character);
+                await Flows.RecievePayloadFlow<WriteMessage>(LocalID, RemoteID);
             }
 
-            await Flows.WriteFlow(Stream, LocalID, RemoteID, "\0\x01\0\0\0\r");
+            await Flows.WriteFlow<OkayMessage>(LocalID, RemoteID, "\0\x01\0\0\0\r");
 
-            await Flows.RecievePayloadFlow(Stream, Reader, LocalID, RemoteID);
-
-            List<Message> ShellMessages = new List<Message>();
+            List<string> Console = new List<string>();
+            Message Message;
 
             while (true)
             {
-                Message Message = await Flows.RecievePayloadFlow(Stream, Reader, LocalID, RemoteID, false);
+                Message = await Flows.RecieveStreamingPayloadFlow<WriteMessage>(LocalID, RemoteID);
 
-                ShellMessages.Add(Message);
+                if (Message.Command == Protocol.Command.CLSE)
+                {
+                    //Happens Due To Sending Shell "exit" Command.
+                    throw new NotImplementedException();
+                }
 
-                if (Message.Payload.EndsWith(":/ $ "))
+                if (Message.Command != Protocol.Command.WRTE)
+                {
+                    throw new UnexpectedMessageException();
+                }
+
+                Console.Add(Encoding.UTF8.GetString(Message.Payload));
+
+                if (Console.Last().Contains(Username))
                 {
                     break;
                 }
             }
 
-            return string.Join(Environment.NewLine, ShellMessages.Select(Msg => GetPrintableCharacters(Msg.Payload)));
-        }
-        private async Task<uint> IntializeShellFlow(NetworkStream Stream, StreamReader Reader, uint LocalID)
-        {
-            Message ConnectOkay = await Flows.ConnectFlow(Stream, Reader, Systems.Host);
+            string CompletePayload = string.Concat(Console);
 
-            Message OpenOkay = await Flows.OpenFlow(Stream, Reader, LocalID, $"shell,v2,cmd:\0"); //try cmd instrad of pty
-            //Message OpenOkay = await Flows.OpenFlow(Stream, Reader, LocalID, $"shell,v2,pty:\0"); //try cmd instrad of pty
+            return SimulateConsole(CompletePayload);
+        }
+
+
+        private async Task<Message> OpenShellFlow()
+        {
+            Flows = new Flows(EndPoint);
+
+            WriteMessage WriteMessage = await Flows.ConnectFlow<WriteMessage>(Systems.Host);
+
+            OkayMessage OpenOkay = await Flows.OpenFlow<OkayMessage>(LocalID, $"shell,v2,pty:\0");
 
             RemoteID = OpenOkay.Argument1;
 
-            Message WriteOkay = await Flows.WriteFlow(Stream, LocalID, RemoteID, "\x05\v\0\0\030x120,0x0\0");
+            OkayMessage WriteOkay = await Flows.WriteFlow<OkayMessage>(LocalID, RemoteID, "\x05\v\0\0\030x120,0x0\0");
 
-            Message ConsoleWelcome = await Flows.RecievePayloadFlow(Stream, Reader, LocalID, RemoteID);
+            WriteMessage ConsoleWelcome = await Flows.RecievePayloadFlow<WriteMessage>(LocalID, RemoteID);
+
+            Username = SimulateConsole(Encoding.UTF8.GetString(ConsoleWelcome.Payload))[0];
+
+            Username = Username.Split('/')[0];
 
             IsIntialized = true;
 
-            return RemoteID;
+            return ConsoleWelcome;
         }
-        private string GetPrintableCharacters(string Data)
+
+        private List<string> SimulateConsole(string Data)
         {
+            List<string> Console = new List<string>();
+
             StringBuilder Builder = new StringBuilder();
 
-            foreach (char Character in Data)
+            //File.WriteAllText("Data.txt", Data);
+
+            for (int i = 0; i < Data.Length; i++)
             {
-                if (Character == 10)
+                if (Char.IsControl(Data[i]))
                 {
-                    Builder.Append(Character);
+                    if (Data[i] == 1) //Start Of Header (Strange Undocumented Behaviour)
+                    {
+                        i += 1;
+                    }
+
+                    if (Data[i] == 8) //Backspace
+                    {
+                        if (Builder.Length - 1 >= 0) //Index Check
+                        {
+                            if (char.IsControl(Data[i - 1]))
+                            {
+                                continue;
+                            }
+                            else
+                            {
+                                Builder.Remove(Builder.Length - 1, 1);
+                            }
+                        }
+                    }
+
+                    if (Data[i] == 13) //Carriage Return
+                    {
+                        if (Data.Length > i + 1) //Index Check
+                        {
+                            if (Data[i + 1] == 10) //New Line
+                            {
+                                if (Builder.Length > 0) //Avoid Empty Lines
+                                {
+                                    Console.Add(Builder.ToString());
+                                }
+
+                                Builder.Clear();
+                                i += 1;
+                            }
+                            else
+                            {
+                                continue;
+                            }
+                        }
+                    }
+
                     continue;
                 }
-
-                if (Character >= 32 && Character <= 126)
+                else
                 {
-                    Builder.Append(Character);
+                    if (Data[i] == 65533)
+                    {
+                        continue;
+                    }
+
+                    Builder.Append(Data[i]);
                 }
             }
 
-            return Builder.ToString();
+            Console.Add(Builder.ToString());
+
+            return Console;
         }
+
+
     }
 }

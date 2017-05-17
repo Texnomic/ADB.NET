@@ -44,9 +44,12 @@
     <Compile Include="AdbClient.cs" />
     <Compile Include="Models\Emulator.cs" />
     <Compile Include="Exceptions.cs" />
+    <Compile Include="Models\Install.cs" />
+    <Compile Include="Models\Root.cs" />
     <Compile Include="Models\Shell.cs" />
     <Compile Include="Models\ShellFlow.cs" />
-    <Compile Include="Protocol\AIO.cs" />
+    <Compile Include="Models\Sync.cs" />
+    <Compile Include="Models\SyncFlow.cs" />
     <Compile Include="Protocol\Core.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Protocol\Constants.cs" />
